@@ -5,7 +5,7 @@
 // @author              vtpearce and crazycaveman
 // @include             https://www.waze.com/editor
 // @include             /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor.*$/
-// @version             1.5.2
+// @version             1.5.3b1
 // @grant               none
 // @copyright           2017 vtpearce
 // @license             CC BY-SA 4.0
@@ -46,6 +46,7 @@ var WMEWAL_Streets;
         Issue[Issue["NoName"] = 512] = "NoName";
         Issue[Issue["NoCity"] = 1024] = "NoCity";
         Issue[Issue["RoutingPreference"] = 2048] = "RoutingPreference";
+        Issue[Issue["UnknownDirection"] = 4096] = "UnknownDirection";
     })(Issue || (Issue = {}));
     var pluginName = "WMEWAL-Streets";
     WMEWAL_Streets.Title = "Streets";
