@@ -5,15 +5,16 @@
 // @author              vtpearce and crazycaveman
 // @include             https://www.waze.com/editor
 // @include             /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor.*$/
-// @version             1.3.13
+// @version             1.3.13b2
 // @grant               none
 // @copyright           2017 vtpearce
 // @license             CC BY-SA 4.0
+// @require             https://greasyfork.org/scripts/39208-wme-utils-google-link-enhancer/code/WME%20Utils%20-%20Google%20Link%20Enhancer.js?version=621415
 // @updateURL           https://greasyfork.org/scripts/40645-wme-wide-angle-lens-places/code/WME%20Wide-Angle%20Lens%20Places.meta.js
 // @downloadURL         https://greasyfork.org/scripts/40645-wme-wide-angle-lens-places/code/WME%20Wide-Angle%20Lens%20Places.user.js
 // ==/UserScript==
 
-/*global W, OL, I18n, $, WazeWrap, WMEWAL*/
+/*global W, OL, I18n, $, WazeWrap, WMEWAL, GoogleLinkEnhancer*/
 
 var WMEWAL_Places;
 (function (WMEWAL_Places) {
@@ -40,6 +41,7 @@ var WMEWAL_Places;
     var places;
     var nameRegex = null;
     var cityRegex = null;
+    var urlRegex = null;
     var state;
     var stateName;
     var lastModifiedBy;
@@ -96,6 +98,10 @@ var WMEWAL_Places;
         html += "<tr><td style='padding-left: 20px'><input type='text' id='_wmewalPlacesCity' class='wal-textbox'/><br/>" +
             "<input id='_wmewalPlacesCityIgnoreCase' type='checkbox'/>" +
             "<label for='_wmewalPlacesCityIgnoreCase' style='margin-left: 8px'>Ignore case</label></td></tr>";
+        html += "<tr><td><b>URL RegEx:</b></td></tr>";
+        html += "<tr><td style='padding-left: 20px'><input type='text' id='_wmewalPlacesURL' class='wal-textbox'/><br/>" +
+            "<input id='_wmewalPlacesURLIgnoreCase' type='checkbox'/>" +
+            "<label for='_wmewalPlacesURLIgnoreCase' style='margin-left: 8px'>Ignore case</label></td></tr>";
         html += "<tr><td><b>State:</b></td></tr>";
         html += "<tr><td style='padding-left:20px'>" +
             "<select id='_wmewalPlacesStateOp'>" +
@@ -111,6 +117,8 @@ var WMEWAL_Places;
         html += "<tr><td><b>Last Modified By:</b></td></tr>";
         html += "<tr><td class='wal-indent'>" +
             "<select id='_wmewalPlacesLastModifiedBy'/></td></tr>";
+        
+        //Issues
         html += "<tr><td><input id='_wmewalPlacesEditable' type='checkbox'/>" +
             "<label for='_wmewalPlacesEditable' style='padding-left: 20px'>Editable by me</label></td></tr>";
         html += "<tr><td><input type='checkbox' id='_wmewalPlacesNoHouseNumber'/>" +
@@ -119,7 +127,11 @@ var WMEWAL_Places;
             "<label for='_wmewalPlacesNoStreet' style='padding-left: 20px'>Missing Street</label></td></tr>";
         html += "<tr><td><input type='checkbox' id='_wmewalPlacesAdLocked'/>" +
             "<label for='_wmewalPlacesAdLocked' style='padding-left: 20px'>Ad Locked</label></td></tr>";
-        html += "<tr><td ><input type='checkbox' id='_wmewalPlacesUpdateRequests'/>" +
+        html += "<tr><td><input type='checkbox' id='_wmewalPlacesNoGoogleLink'/>" +
+            "<label for='_wmewalPlacesNoGoogleLink' style='padding-left: 20px'>Missing Google link</label></td></tr>";
+        html += "<tr><td><input type='checkbox' id='_wmewalPlacesBadGoogleLink'/>" +
+            "<label for='_wmewalPlacesBadGoogleLink' style='padding-left: 20px'>Problems with Google link</label></td></tr>";
+        html += "<tr><td><input type='checkbox' id='_wmewalPlacesUpdateRequests'/>" +
             "<label for='_wmewalPlacesUpdateRequests' style='padding-left: 20px'>Has Update Requests</label></td></tr>";
         html += "<tr><td ><input type='checkbox' id='_wmewalPlacesPendingApproval'/>" +
             "<label for='_wmewalPlacesPendingApproval' style='padding-left: 20px'>Pending Approval</label></td></tr>";
@@ -229,6 +241,10 @@ var WMEWAL_Places;
         $("#_wmewalPlacesPendingApproval").prop("checked", settings.PendingApproval);
         $("#_wmewalPlacesNoStreet").prop("checked", settings.NoStreet);
         $("#_wmewalPlacesLastModifiedBy").val(settings.LastModifiedBy);
+        $("#_wmewalPlacesURL").val(settings.URLRegex);
+        $("#_wmewalPlacesURLIgnoreCase").prop("checked", settings.URLRegexIgnoreCase);
+        $("#_wmewalPlacesNoGoogleLink").prop("checked", settings.MissingGoogleLink);
+        $("#_wmewalPlacesBadGoogleLink").prop("checked", settings.ProblemGoogleLink);
     }
     function loadSetting() {
         var selectedSetting = parseInt($("#_wmewalPlacesSavedSettings").val());
@@ -307,6 +323,10 @@ var WMEWAL_Places;
                 CityRegex: null,
                 CityRegexIgnoreCase: $("#_wmewalPlacesCityIgnoreCase").prop("checked"),
                 NoStreet: $("#_wmewalPlacesNoStreet").prop("checked"),
+                URLRegex: null,
+                URLRegexIgnoreCase: $("#_wmewalPlacesURLIgnoreCase").prop("checked"),
+                MissingGoogleLink: $("#_wmewalPlacesNoGoogleLink").prop("checked"),
+                ProblemGoogleLink: $("#_wmewalPlacesBadGoogleLink").prop("checked"),
                 LastModifiedBy: null
             };
             var pattern = $("#_wmewalPlacesName").val();
@@ -389,6 +409,12 @@ var WMEWAL_Places;
                 settings.CityRegex = pattern;
                 cityRegex = (settings.CityRegexIgnoreCase ? new RegExp(pattern, "i") : new RegExp(pattern));
             }
+            settings.URLRegexIgnoreCase = $("#_wmewalPlacesURLIgnoreCase").prop("checked");
+            pattern = $("#_wmewalPlacesURL").val();
+            if (pattern.length !== 0) {
+                settings.URLRegex = pattern;
+                urlRegex = (settings.URLRegexIgnoreCase ? new RegExp(pattern, "i") : new RegExp(pattern));
+            }
             var selectedState = $("#_wmewalPlacesState").val();
             state = null;
             settings.State = null;
@@ -425,6 +451,8 @@ var WMEWAL_Places;
             settings.NoHouseNumber = $("#_wmewalPlacesNoHouseNumber").prop("checked");
             settings.EditableByMe = $("#_wmewalPlacesEditable").prop("checked");
             settings.AdLocked = $("#_wmewalPlacesAdLocked").prop("checked");
+            settings.MissingGoogleLink = $("#_wmewalPlacesNoGoogleLink").prop("checked");
+            settings.ProblemGoogleLink = $("#_wmewalPlacesBadGoogleLink").prop("checked");
             settings.UpdateRequests = $("#_wmewalPlacesUpdateRequests").prop("checked");
             settings.PendingApproval = $("#_wmewalPlacesPendingApproval").prop("checked");
             settings.NoStreet = $("#_wmewalPlacesNoStreet").prop("checked");
@@ -435,24 +463,28 @@ var WMEWAL_Places;
     WMEWAL_Places.ScanStarted = ScanStarted;
     function ScanExtent(segments, venues) {
         var def = $.Deferred();
+        var gle = new GoogleLinkEnhancer;
         for (var ix = 0; ix < venues.length; ix++) {
             var venue = venues[ix];
-            if (venue != null) {
+            if (venue !== null) {
                 var categories = venue.attributes.categories;
                 var address = venue.getAddress();
-                if ((settings.LockLevel == null ||
+                if ((settings.LockLevel === null ||
                     (settings.LockLevelOperation === Operation.Equal && (venue.attributes.lockRank || 0) + 1 === settings.LockLevel) ||
                     (settings.LockLevelOperation === Operation.NotEqual && (venue.attributes.lockRank || 0) + 1 !== settings.LockLevel)) &&
                     (!settings.EditableByMe || venue.arePropertiesEditable() || venue.areUpdateRequestsEditable()) &&
-                    (settings.PlaceType == null || (settings.PlaceType === "point" && venue.isPoint() && !venue.is2D()) || (settings.PlaceType === "area" && !venue.isPoint() && venue.is2D())) &&
-                    (nameRegex == null || nameRegex.test(venue.attributes.name)) &&
-                    (!settings.NoHouseNumber || address == null || address.attributes == null || address.attributes.houseNumber == null) &&
+                    (settings.PlaceType === null || (settings.PlaceType === "point" && venue.isPoint() && !venue.is2D()) || (settings.PlaceType === "area" && !venue.isPoint() && venue.is2D())) &&
+                    (nameRegex === null || nameRegex.test(venue.attributes.name)) &&
+                    (urlRegex === null || urlRegex.test(venue.attributes.url)) &&
+                    (!settings.NoHouseNumber || address === null || address.attributes === null || address.attributes.houseNumber === null) &&
                     (!settings.AdLocked || venue.attributes.adLocked) &&
+                    ((!settings.MissingGoogleLink || venue.attributes.externalProviderIDs === null || venue.attributes.externalProviderIDs.length === 0) && categories.indexOf("RESIDENCE_HOME") === -1) &&
+                    //(!settings.ProblemGoogleLink) &&
                     (!settings.UpdateRequests || venue.hasOpenUpdateRequests()) &&
                     (!settings.PendingApproval || !venue.isApproved()) &&
-                    (!settings.NoStreet || address == null || address.attributes == null || address.attributes.street == null || address.attributes.street.isEmpty || address.attributes.street.name == null)) {
-                    if (state != null) {
-                        if (address != null && address.attributes != null && !address.attributes.isEmpty && address.attributes.state != null) {
+                    (!settings.NoStreet || address === null || address.attributes === null || address.attributes.street === null || address.attributes.street.isEmpty || address.attributes.street.name === null)) {
+                    if (state !== null) {
+                        if (address !== null && address.attributes !== null && !address.attributes.isEmpty && address.attributes.state != null) {
                             if (settings.StateOperation === Operation.Equal && address.attributes.state.id !== state.id ||
                                 settings.StateOperation === Operation.NotEqual && address.attributes.state.id === state.id) {
                                 continue;
@@ -462,8 +494,8 @@ var WMEWAL_Places;
                             continue;
                         }
                     }
-                    if (settings.LastModifiedBy != null) {
-                        if (venue.attributes.updatedBy != null) {
+                    if (settings.LastModifiedBy !== null) {
+                        if (venue.attributes.updatedBy !== null) {
                             if (venue.attributes.updatedBy !== settings.LastModifiedBy) {
                                 continue;
                             }
@@ -472,18 +504,18 @@ var WMEWAL_Places;
                             continue;
                         }
                     }
-                    if (settings.Category != null) {
+                    if (settings.Category !== null) {
                         var categoryMatch = categories.find(function (e) {
                             return e.localeCompare(settings.Category) === 0;
                         });
-                        if (typeof categoryMatch === "undefined" || categoryMatch == null || categoryMatch.length === 0) {
+                        if (typeof categoryMatch === "undefined" || categoryMatch === null || categoryMatch.length === 0) {
                             continue;
                         }
                     }
-                    if (cityRegex != null) {
+                    if (cityRegex !== null) {
                         var nameMatched = false;
-                        if (address != null && !address.attributes.isEmpty) {
-                            if (address.attributes.city != null && address.attributes.city.hasName()) {
+                        if (address !== null && !address.attributes.isEmpty) {
+                            if (address.attributes.city !== null && address.attributes.city.hasName()) {
                                 nameMatched = cityRegex.test(address.attributes.city.attributes.name);
                             }
                         }
@@ -491,9 +523,25 @@ var WMEWAL_Places;
                             continue;
                         }
                     }
-                    if (!WMEWAL.IsVenueInArea(venue)) {
-                        continue;
+                    if (settings.ProblemGoogleLink) {
+                        let noProblem = true;
+                        venue.attributes.externalProviderIDs.forEach(provID => {
+                            let id = provID.attributes.uuid;
+                            gle._getLinkInfoAsync(id).then(link => {
+                                // Only check closed and invalid links
+                                if (link.closed || link.notFound) {
+                                    console.log(`Place closed or link invalid: ${venue.attributes.name}`)
+                                    noProblem = false;
+                                }
+                            });
+                        });
+                        if (noProblem) {
+                            continue;
+                        }
                     }
+                    /*if (!WMEWAL.IsVenueInArea(venue)) {
+                        continue;
+                    }*/
                     var lastEditorID = venue.attributes.updatedBy || venue.attributes.createdBy;
                     var lastEditor = W.model.users.getObjectById(lastEditorID);
                     var place = {
@@ -512,7 +560,7 @@ var WMEWAL_Places;
                         state: ((address && !address.attributes.isEmpty) ? address.attributes.state.name : "No State"),
                         houseNumber: venue.attributes.houseNumber || "",
                         streetName: ((address && !address.attributes.isEmpty && !address.attributes.street.isEmpty) ? address.attributes.street.name : "") || "",
-                        hasExternalProvider: venue.attributes.externalProviderIDs != null && venue.attributes.externalProviderIDs.length > 0,
+                        hasExternalProvider: venue.attributes.externalProviderIDs !== null && venue.attributes.externalProviderIDs.length > 0,
                         lastEditor: (lastEditor && lastEditor.userName) || "",
                         url: venue.attributes.url || "",
                         phone: venue.attributes.phone || "",
@@ -687,6 +735,31 @@ var WMEWAL_Places;
             }
             console.log(objectToCheck[i] + " OK");
         }
+        let defaultSettings = {
+            OutputTo: "csv",
+            Regex: null,
+            RegexIgnoreCase: true,
+            Category: null,
+            NoHouseNumber: false,
+            State: null,
+            StateOperation: Operation.Equal,
+            LockLevel: null,
+            LockLevelOperation: Operation.Equal,
+            EditableByMe: true,
+            AdLocked: false,
+            UpdateRequests: false,
+            PlaceType: null,
+            PendingApproval: false,
+            CityRegex: null,
+            CityRegexIgnoreCase: true,
+            URLRegex: null,
+            URLRegexIgnoreCase: true,
+            NoStreet: false,
+            LastModifiedBy: null,
+            MissingGoogleLink: false,
+            ProblemGoogleLink: false,
+            Version: Version
+        };
         if (typeof Storage !== "undefined") {
             if (localStorage[settingsKey]) {
                 settings = JSON.parse(localStorage[settingsKey]);
@@ -716,28 +789,15 @@ var WMEWAL_Places;
                 }
             }
         }
-        if (settings == null) {
-            settings = {
-                OutputTo: "csv",
-                Regex: null,
-                RegexIgnoreCase: true,
-                Category: null,
-                NoHouseNumber: false,
-                State: null,
-                StateOperation: Operation.Equal,
-                LockLevel: null,
-                LockLevelOperation: Operation.Equal,
-                EditableByMe: true,
-                AdLocked: false,
-                UpdateRequests: false,
-                PlaceType: null,
-                PendingApproval: false,
-                CityRegex: null,
-                CityRegexIgnoreCase: true,
-                NoStreet: false,
-                LastModifiedBy: null,
-                Version: Version
-            };
+        // Add any missing defaults to settings
+        Object.keys(defaultSettings).forEach((prop) => {
+            if (!Object.prototype.hasOwnProperty.call(settings, prop)) {
+                settings[prop] = defaultSettings[prop];
+            }
+        });
+        updateSettings();
+        /*if (settings == null) {
+            settings = defaultSettings;
         }
         else {
             if (!settings.hasOwnProperty("NoStreet")) {
@@ -750,7 +810,7 @@ var WMEWAL_Places;
                 settings.Version = Version;
                 updateSettings();
             }
-        }
+        }*/
         console.log("Initialized");
         console.groupEnd();
         WazeWrap.Interface.ShowScriptUpdate(scrName, Version, updateText, greasyForkPage, wazeForumThread);
