@@ -527,13 +527,13 @@ var WMEWAL_Places;
                         let noProblem = true;
                         venue.attributes.externalProviderIDs.forEach(provID => {
                             let id = provID.attributes.uuid;
-                            gle._getLinkInfoAsync(id).then(link => {
+                            let link = await gle._getLinkInfoAsync(id);
+                            console.log(link);
+                            if (link !== null && (link.closed || link.notFound)) {
                                 // Only check closed and invalid links
-                                if (link.closed || link.notFound) {
-                                    console.log(`Place closed or link invalid: ${venue.attributes.name}`)
-                                    noProblem = false;
-                                }
-                            });
+                                console.log(`Place closed or link invalid: ${venue.attributes.name}`)
+                                noProblem = false;
+                            }
                         });
                         if (noProblem) {
                             continue;
