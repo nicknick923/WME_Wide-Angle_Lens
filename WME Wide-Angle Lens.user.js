@@ -5,7 +5,7 @@
 // @author              vtpearce and crazycaveman (progress bar from dummyd2 & seb-d59)
 // @include             https://www.waze.com/editor
 // @include             /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor.*$/
-// @version             1.4.9
+// @version             1.4.10
 // @grant               none
 // @copyright           2017 vtpearce
 // @license             CC BY-SA 4.0
@@ -20,7 +20,7 @@ var WMEWAL;
 (function (WMEWAL) {
     const scrName = GM_info.script.name;
     const Version = GM_info.script.version;
-    const updateText = '<ul><li>When cancelling a scan, properly reset everything even if there are errors</li></ul>';
+    const updateText = 'Adding support for road attributes';
     const greasyForkPage = 'https://greasyfork.org/scripts/40641';
     const wazeForumThread = 'https://www.waze.com/forum/viewtopic.php?t=206376';
 
@@ -71,6 +71,14 @@ var WMEWAL;
         RoadType[RoadType["Alley"] = 32768] = "Alley";
     })(WMEWAL.RoadType || (WMEWAL.RoadType = {}));
     var RoadType = WMEWAL.RoadType;
+    var RoadAttribute = {};
+    RoadAttribute[RoadAttribute.unpaved = 1] = 'unpaved';
+    RoadAttribute[RoadAttribute.tunnel = 2] = 'tunnel';
+    RoadAttribute[RoadAttribute.headlights = 4] = 'headlights';
+    RoadAttribute[RoadAttribute.nearbyHOV = 8] = 'nearbyHOV';
+    RoadAttribute[RoadAttribute.toll_road = 16] = 'toll_road';
+    RoadAttribute[RoadAttribute.beacons = 32] = 'beacons';
+    WMEWAL.RoadAttribute = RoadAttribute;
     var topLeft = null;
     var bottomRight = null;
     WMEWAL.areaToScan = null;
