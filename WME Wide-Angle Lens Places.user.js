@@ -52,6 +52,7 @@ var WMEWAL_Places;
         Issue[Issue["NoHours"] = 128] = "NoHours";
         Issue[Issue["NoEntryExitPoints"] = 256] = "NoEntryExitPoints";
         Issue[Issue["MissingBrand"] = 512] = "MissingBrand";
+        Issue[Issue["InvalidPhoneNumber"] = 1024] = "InvalidPhoneNumber";
     })(Issue || (Issue = {}));
     let pluginName = "WMEWAL-Places";
     WMEWAL_Places.Title = "Places";
@@ -202,6 +203,8 @@ var WMEWAL_Places;
             `<label for='${ctlPrefix}NoExternalProviders' class='wal-label'>No External Provider Links</label></td></tr>`;
         html += `<tr><td><input type='checkbox' id='${ctlPrefix}NoHours' />` +
             `<label for='${ctlPrefix}NoHours' class='wal-label'>No Hours</label></td></tr>`;
+        html += `<tr><td><input type='checkbox' id='${ctlPrefix}InvalidPhoneNumber' />` +
+            `<label for='${ctlPrefix}InvalidPhoneNumber' class='wal-label'>Invalid Phone Number</label></td></tr>`;
         html += `<tr><td><input type='checkbox' id='${ctlPrefix}NoEntryExitPoints' />` +
             `<label for='${ctlPrefix}NoEntryExitPoints' class='wal-label'>No Entry/Exit Points</label></td></tr>`;
         html += `<tr><td><input type='checkbox' id='${ctlPrefix}MissingBrand' />` +
@@ -322,6 +325,7 @@ var WMEWAL_Places;
         $(`#${ctlPrefix}CreatedBy`).val(settings.CreatedBy);
         $(`#${ctlPrefix}NoExternalProviders`).prop("checked", settings.NoExternalProviders);
         $(`#${ctlPrefix}NoHours`).prop("checked", settings.NoHours);
+        $(`#${ctlPrefix}InvalidPhoneNumber`).prop("checked", settings.InvalidPhoneNumber);
         $(`#${ctlPrefix}NoEntryExitPoints`).prop("checked", settings.NoEntryExitPoints);
         $(`#${ctlPrefix}ParkingLotType`).prop("checked", settings.ParkingLotType);
         $(`#${ctlPrefix}ParkingLotTypeFilter`).val(settings.ParkingLotTypeFilter);
@@ -498,6 +502,7 @@ var WMEWAL_Places;
             CreatedBy: null,
             NoExternalProviders: $(`#${ctlPrefix}NoExternalProviders`).prop("checked"),
             NoHours: $(`#${ctlPrefix}NoHours`).prop("checked"),
+            InvalidPhoneNumber: $(`#${ctlPrefix}InvalidPhoneNumber`).prop("checked"),
             NoEntryExitPoints: $(`#${ctlPrefix}NoEntryExitPoints`).prop("checked"),
             ParkingLotType: $(`#${ctlPrefix}ParkingLotType`).prop("checked"),
             ParkingLotTypeFilter: $(`#${ctlPrefix}ParkingLotTypeFilter`).val(),
@@ -641,6 +646,7 @@ var WMEWAL_Places;
                 settings.UndefStreet ||
                 settings.NoExternalProviders ||
                 settings.NoHours ||
+                settings.InvalidPhoneNumber ||
                 settings.NoEntryExitPoints ||
                 settings.MissingBrand;
             updateSettings();
@@ -667,6 +673,7 @@ var WMEWAL_Places;
             }
             return true;
         }
+        let validPhoneRegex = new RegExp("\\(\\d\\d\\d\\) \\d\\d\\d-\\d\\d\\d\\d");
         for (let ix = 0; ix < venues.length; ix++) {
             let venue = venues[ix];
             if (venue != null) {
@@ -774,6 +781,9 @@ var WMEWAL_Places;
                     }
                     if (settings.NoHours && (!venue.attributes.openingHours || venue.attributes.openingHours.length === 0)) {
                         issues |= Issue.NoHours;
+                    }
+                    if (settings.InvalidPhoneNumber && (venue.attributes.phone && !validPhoneRegex.test(venue.attributes.phone))) {
+                        issues |= Issue.InvalidPhoneNumber;
                     }
                     if (settings.NoEntryExitPoints && (!venue.attributes.entryExitPoints || venue.attributes.entryExitPoints.length === 0)) {
                         issues |= Issue.NoEntryExitPoints;
@@ -968,6 +978,9 @@ var WMEWAL_Places;
                 if (settings.NoHours) {
                     w.document.write("<br/>No hours");
                 }
+                if (settings.InvalidPhoneNumber) {
+                    w.document.write("<br/>Invalid phone number");
+                }
                 if (settings.NoEntryExitPoints) {
                     w.document.write("<br/>No entry/exit points");
                 }
@@ -1161,6 +1174,7 @@ var WMEWAL_Places;
                 UndefStreet: false,
                 NoExternalProviders: false,
                 NoHours: false,
+                InvalidPhoneNumber: false,
                 NoEntryExitPoints: false,
                 ParkingLotType: false,
                 ParkingLotTypeFilter: null,
@@ -1205,6 +1219,10 @@ var WMEWAL_Places;
             }
             if (!settings.hasOwnProperty("NoHours")) {
                 settings.NoHours = false;
+                upd = true;
+            }
+            if (!settings.hasOwnProperty("InvalidPhoneNumber")) {
+                settings.InvalidPhoneNumber = false;
                 upd = true;
             }
             if (!settings.hasOwnProperty("NoEntryExitPoints")) {
@@ -1307,6 +1325,9 @@ var WMEWAL_Places;
         }
         if (issues & Issue.NoHours) {
             issuesList.push("No hours");
+        }
+        if (issues & Issue.InvalidPhoneNumber) {
+            issuesList.push("Invalid phone number");
         }
         if (issues & Issue.NoEntryExitPoints) {
             issuesList.push("No entry/exit points");
