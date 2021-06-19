@@ -27,8 +27,11 @@ var WMEWAL_Places;
     const updateText = '<ul>' +
         '<li>Add Category Operation</li>' +
         '<li>Add No Phone Number option</li>' +
+        '<li>Add Bad Phone Number Format option</li>' +
         '<li>Added No Website option</li>' +
         '<li>Added No Name option</li>' +
+        '<li>Add No City option</li>' +
+        '<li>Add Duplicate External Provider option</li>' +
         '</ul>';
     const greasyForkPage = 'https://greasyfork.org/scripts/40645';
     const wazeForumThread = 'https://www.waze.com/forum/viewtopic.php?t=206376';
@@ -60,6 +63,7 @@ var WMEWAL_Places;
         Issue[Issue["NoWebsite"] = 4096] = "NoWebsite";
         Issue[Issue["NoCity"] = 8192] = "NoCity";
         Issue[Issue["NoName"] = 16384] = "NoName";
+        Issue[Issue["DuplicateExternalProvider"] = 32768] = "DuplicateExternalProvider";
     })(Issue || (Issue = {}));
     let pluginName = "WMEWAL-Places";
     WMEWAL_Places.Title = "Places";
@@ -215,6 +219,8 @@ var WMEWAL_Places;
             `<label for='${ctlPrefix}UndefStreet' class='wal-label' title='Street ID not found in W.model.streets.objects, possibly as a result of a cities form Merge or Delete'>Undefined Street ID</label></td></tr>`;
         html += `<tr><td><input type='checkbox' id='${ctlPrefix}NoExternalProviders' />` +
             `<label for='${ctlPrefix}NoExternalProviders' class='wal-label'>No External Provider Links</label></td></tr>`;
+        html += `<tr><td><input type='checkbox' id='${ctlPrefix}DuplicateExternalProvider' />` +
+            `<label for='${ctlPrefix}DuplicateExternalProvider' class='wal-label'>Duplicate External Provider Links</label></td></tr>`;
         html += `<tr><td><input type='checkbox' id='${ctlPrefix}NoHours' />` +
             `<label for='${ctlPrefix}NoHours' class='wal-label'>No Hours</label></td></tr>`;
         html += `<tr><td><input type='checkbox' id='${ctlPrefix}NoWebsite' />` +
@@ -345,6 +351,7 @@ var WMEWAL_Places;
         $(`#${ctlPrefix}LastModifiedBy`).val(settings.LastModifiedBy);
         $(`#${ctlPrefix}CreatedBy`).val(settings.CreatedBy);
         $(`#${ctlPrefix}NoExternalProviders`).prop("checked", settings.NoExternalProviders);
+        $(`#${ctlPrefix}DuplicateExternalProvider`).prop("checked", settings.DuplicateExternalProvider);
         $(`#${ctlPrefix}NoHours`).prop("checked", settings.NoHours);
         $(`#${ctlPrefix}NoPhoneNumber`).prop("checked", settings.NoPhoneNumber);
         $(`#${ctlPrefix}BadPhoneNumberFormat`).prop("checked", settings.BadPhoneNumberFormat);
@@ -527,6 +534,7 @@ var WMEWAL_Places;
             LastModifiedBy: null,
             CreatedBy: null,
             NoExternalProviders: $(`#${ctlPrefix}NoExternalProviders`).prop("checked"),
+            DuplicateExternalProvider: $(`#${ctlPrefix}DuplicateExternalProvider`).prop("checked"),
             NoHours: $(`#${ctlPrefix}NoHours`).prop("checked"),
             NoPhoneNumber: $(`#${ctlPrefix}NoPhoneNumber`).prop("checked"),
             BadPhoneNumberFormat: $(`#${ctlPrefix}BadPhoneNumberFormat`).prop("checked"),
@@ -675,6 +683,7 @@ var WMEWAL_Places;
                 settings.PendingApproval ||
                 settings.UndefStreet ||
                 settings.NoExternalProviders ||
+                settings.DuplicateExternalProvider ||
                 settings.NoHours ||
                 settings.NoPhoneNumber ||
                 settings.BadPhoneNumberFormat ||
@@ -816,6 +825,13 @@ var WMEWAL_Places;
                     }
                     if (settings.NoExternalProviders && (!venue.attributes.externalProviderIDs || venue.attributes.externalProviderIDs.length === 0)) {
                         issues |= Issue.NoExternalProviders;
+                    }
+                    if (settings.DuplicateExternalProvider && (venue.attributes.externalProviderIDs && venue.attributes.externalProviderIDs.length > 1)) {
+                        venue.attributes.externalProviderIDs.forEach(provID => {
+                            if (venue.attributes.externalProviderIDs.filter(x => x.attributes.uuid === provID.attributes.uuid).length > 1) {
+                                issues |= Issue.DuplicateExternalProvider;
+                            }
+                        });
                     }
                     if (settings.NoHours && (!venue.attributes.openingHours || venue.attributes.openingHours.length === 0)) {
                         issues |= Issue.NoHours;
@@ -1028,6 +1044,9 @@ var WMEWAL_Places;
                 if (settings.NoExternalProviders) {
                     w.document.write("<br/>No external provider links");
                 }
+                if (settings.DuplicateExternalProvider) {
+                    w.document.write("<br/>Duplicate external provider links");
+                }
                 if (settings.NoHours) {
                     w.document.write("<br/>No hours");
                 }
@@ -1235,6 +1254,7 @@ var WMEWAL_Places;
                 CreatedBy: null,
                 UndefStreet: false,
                 NoExternalProviders: false,
+                DuplicateExternalProvider: false,
                 NoHours: false,
                 NoPhoneNumber: false,
                 BadPhoneNumberFormat: false,
@@ -1287,6 +1307,10 @@ var WMEWAL_Places;
             }
             if (!settings.hasOwnProperty("NoExternalProviders")) {
                 settings.NoExternalProviders = false;
+                upd = true;
+            }
+            if (!settings.hasOwnProperty("DuplicateExternalProvider")) {
+                settings.DuplicateExternalProvider = false;
                 upd = true;
             }
             if (!settings.hasOwnProperty("NoHours")) {
@@ -1400,6 +1424,9 @@ var WMEWAL_Places;
         }
         if (issues & Issue.NoExternalProviders) {
             issuesList.push("No external provider IDs");
+        }
+        if (issues & Issue.DuplicateExternalProvider) {
+            issuesList.push("Duplicate external provider IDs");
         }
         if (issues & Issue.PendingApproval) {
             issuesList.push("Pending approval");

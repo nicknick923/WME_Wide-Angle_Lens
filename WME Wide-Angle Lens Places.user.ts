@@ -33,6 +33,7 @@ namespace WMEWAL_Places {
         '<li>Added No Website option</li>' +
         '<li>Added No Name option</li>' +
         '<li>Add No City option</li>' +
+        '<li>Add Duplicate External Provider option</li>' +
         '</ul>';
     const greasyForkPage = 'https://greasyfork.org/scripts/40645';
     const wazeForumThread = 'https://www.waze.com/forum/viewtopic.php?t=206376';
@@ -65,7 +66,8 @@ namespace WMEWAL_Places {
         BadPhoneNumberFormat = 1 << 11,
         NoWebsite = 1 << 12,
         NoCity = 1 << 13,
-        NoName = 1 << 14
+        NoName = 1 << 14,
+        DuplicateExternalProvider = 1 << 15
     }
 
     interface IPlace {
@@ -126,6 +128,7 @@ namespace WMEWAL_Places {
         UndefStreet: boolean;
         CreatedBy: number;
         NoExternalProviders: boolean;
+        DuplicateExternalProvider: boolean;
         NoHours: boolean;
         NoPhoneNumber: boolean;
         BadPhoneNumberFormat: boolean;
@@ -317,9 +320,11 @@ namespace WMEWAL_Places {
             `<label for='${ctlPrefix}UndefStreet' class='wal-label' title='Street ID not found in W.model.streets.objects, possibly as a result of a cities form Merge or Delete'>Undefined Street ID</label></td></tr>`;
         html += `<tr><td><input type='checkbox' id='${ctlPrefix}NoExternalProviders' />` +
             `<label for='${ctlPrefix}NoExternalProviders' class='wal-label'>No External Provider Links</label></td></tr>`;
+        html += `<tr><td><input type='checkbox' id='${ctlPrefix}DuplicateExternalProvider' />` +
+            `<label for='${ctlPrefix}DuplicateExternalProvider' class='wal-label'>Duplicate External Provider Links</label></td></tr>`;
         html += `<tr><td><input type='checkbox' id='${ctlPrefix}NoHours' />` +
             `<label for='${ctlPrefix}NoHours' class='wal-label'>No Hours</label></td></tr>`;
-            html += `<tr><td><input type='checkbox' id='${ctlPrefix}NoWebsite' />` +
+        html += `<tr><td><input type='checkbox' id='${ctlPrefix}NoWebsite' />` +
             `<label for='${ctlPrefix}NoWebsite' class='wal-label'>No Website</label></td></tr>`;
         html += `<tr><td><input type='checkbox' id='${ctlPrefix}NoPhoneNumber' />` +
             `<label for='${ctlPrefix}NoPhoneNumber' class='wal-label'>No Phone Number</label></td></tr>`;
@@ -342,10 +347,10 @@ namespace WMEWAL_Places {
         updateSavedSettingsList();
 
         $(`#${ctlPrefix}State`).on("focus", updateStates);
-        $(`#${ctlPrefix}LastModifiedBy`).on("focus", function() {
+        $(`#${ctlPrefix}LastModifiedBy`).on("focus", function () {
             updateUsers($(`#${ctlPrefix}LastModifiedBy`))
         });
-        $(`#${ctlPrefix}CreatedBy`).on("focus", function() {
+        $(`#${ctlPrefix}CreatedBy`).on("focus", function () {
             updateUsers($(`#${ctlPrefix}CreatedBy`))
         });
         $(`#${ctlPrefix}LoadSetting`).on("click", loadSetting);
@@ -362,7 +367,7 @@ namespace WMEWAL_Places {
         selectState.empty();
 
         let stateObjs: Array<IState> = [];
-        stateObjs.push({id: null, name: "" });
+        stateObjs.push({ id: null, name: "" });
 
         for (let s in W.model.states.objects) {
             if (W.model.states.objects.hasOwnProperty(s)) {
@@ -399,7 +404,7 @@ namespace WMEWAL_Places {
         selectUsernameList.empty();
 
         let userObjs: Array<IUser> = [];
-        userObjs.push({id: null, name: "" });
+        userObjs.push({ id: null, name: "" });
 
         for (let uo in W.model.users.objects) {
             if (W.model.users.objects.hasOwnProperty(uo)) {
@@ -465,6 +470,7 @@ namespace WMEWAL_Places {
         $(`#${ctlPrefix}LastModifiedBy`).val(settings.LastModifiedBy);
         $(`#${ctlPrefix}CreatedBy`).val(settings.CreatedBy);
         $(`#${ctlPrefix}NoExternalProviders`).prop("checked", settings.NoExternalProviders);
+        $(`#${ctlPrefix}DuplicateExternalProvider`).prop("checked", settings.DuplicateExternalProvider);
         $(`#${ctlPrefix}NoHours`).prop("checked", settings.NoHours);
         $(`#${ctlPrefix}NoPhoneNumber`).prop("checked", settings.NoPhoneNumber);
         $(`#${ctlPrefix}BadPhoneNumberFormat`).prop("checked", settings.BadPhoneNumberFormat);
@@ -666,6 +672,7 @@ namespace WMEWAL_Places {
             LastModifiedBy: null,
             CreatedBy: null,
             NoExternalProviders: $(`#${ctlPrefix}NoExternalProviders`).prop("checked"),
+            DuplicateExternalProvider: $(`#${ctlPrefix}DuplicateExternalProvider`).prop("checked"),
             NoHours: $(`#${ctlPrefix}NoHours`).prop("checked"),
             NoPhoneNumber: $(`#${ctlPrefix}NoPhoneNumber`).prop("checked"),
             BadPhoneNumberFormat: $(`#${ctlPrefix}BadPhoneNumberFormat`).prop("checked"),
@@ -832,6 +839,7 @@ namespace WMEWAL_Places {
                 settings.PendingApproval ||
                 settings.UndefStreet ||
                 settings.NoExternalProviders ||
+                settings.DuplicateExternalProvider ||
                 settings.NoHours ||
                 settings.NoPhoneNumber ||
                 settings.BadPhoneNumberFormat ||
@@ -995,6 +1003,14 @@ namespace WMEWAL_Places {
                         issues |= Issue.NoExternalProviders;
                     }
 
+                    if (settings.DuplicateExternalProvider && (venue.attributes.externalProviderIDs && venue.attributes.externalProviderIDs.length > 1)) {
+                        venue.attributes.externalProviderIDs.forEach(provID => {
+                            if (venue.attributes.externalProviderIDs.filter(x => x.attributes.uuid === provID.attributes.uuid).length > 1) {
+                                issues |= Issue.DuplicateExternalProvider;
+                            }
+                        });
+                    }
+
                     if (settings.NoHours && (!venue.attributes.openingHours || venue.attributes.openingHours.length === 0)) {
                         issues |= Issue.NoHours;
                     }
@@ -1051,7 +1067,7 @@ namespace WMEWAL_Places {
                             houseNumber: venue.attributes.houseNumber ?? "",
                             streetName: ((address && !address.isEmpty() && !address.isEmptyStreet()) ? address.attributes.street.name : "") || "",
                             lastEditor: (lastEditor && lastEditor.userName) || "",
-                            createdBy: (createdBy && createdBy.userName ) || "",
+                            createdBy: (createdBy && createdBy.userName) || "",
                             url: venue.attributes.url ?? "",
                             phone: venue.attributes.phone ?? "",
                             issues: issues,
@@ -1088,11 +1104,11 @@ namespace WMEWAL_Places {
                 if (settings.IncludeAlt) {
                     columnArray.push("Alt Names");
                 }
-                columnArray.push("Categories","City","State","Lock Level","Type","Street","House Number");
+                columnArray.push("Categories", "City", "State", "Lock Level", "Type", "Street", "House Number");
                 if (detectIssues) {
                     columnArray.push("Issues");
                 }
-                columnArray.push("Website","Phone Number","Parking Lot Type","Created By","Last Updated By","Latitude","Longitude","Permalink");
+                columnArray.push("Website", "Phone Number", "Parking Lot Type", "Created By", "Last Updated By", "Latitude", "Longitude", "Permalink");
                 lineArray.push(columnArray);
                 fileName = "Places_" + WMEWAL.areaName;
                 fileName += ".csv";
@@ -1108,7 +1124,7 @@ namespace WMEWAL_Places {
                 w.document.write("<h3>Area: " + WMEWAL.areaName + "</h3>");
                 w.document.write("<h4>Filters</h4>");
                 if (settings.Category != null) {
-                    w.document.write("<br/>Category: " +getOperationText(settings.CategoryOperation) + I18n.t("venues.categories." + settings.Category));
+                    w.document.write("<br/>Category: " + getOperationText(settings.CategoryOperation) + I18n.t("venues.categories." + settings.Category));
                 }
                 if (settings.LockLevel != null) {
                     w.document.write("<br/>Lock Level " + getOperationText(settings.LockLevelOperation) + settings.LockLevel.toString());
@@ -1220,6 +1236,9 @@ namespace WMEWAL_Places {
                 if (settings.NoExternalProviders) {
                     w.document.write("<br/>No external provider links");
                 }
+                if (settings.DuplicateExternalProvider) {
+                    w.document.write("<br/>Duplicate external provider links");
+                }
                 if (settings.NoHours) {
                     w.document.write("<br/>No hours");
                 }
@@ -1313,7 +1332,7 @@ namespace WMEWAL_Places {
             if (isCSV) {
                 let csvContent = lineArray.join("\n");
                 //var encodedUri = "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent);
-                var blob = new Blob([csvContent], {type: "data:text/csv;charset=utf-8;"});
+                var blob = new Blob([csvContent], { type: "data:text/csv;charset=utf-8;" });
                 let link = document.createElement("a");
                 let url = URL.createObjectURL(blob);
                 link.setAttribute("href", url);
@@ -1394,16 +1413,14 @@ namespace WMEWAL_Places {
             if (localStorage[savedSettingsKey]) {
                 try {
                     savedSettings = JSON.parse(WMEWAL.LZString.decompressFromUTF16(localStorage[savedSettingsKey]));
-                } catch (e) {}
-                if (typeof savedSettings === "undefined" || savedSettings === null || savedSettings.length === 0)
-                {
+                } catch (e) { }
+                if (typeof savedSettings === "undefined" || savedSettings === null || savedSettings.length === 0) {
                     log("debug", "decompressFromUTF16 failed, attempting decompress");
-                    localStorage[savedSettingsKey +"Backup"] = localStorage[savedSettingsKey];
+                    localStorage[savedSettingsKey + "Backup"] = localStorage[savedSettingsKey];
                     try {
                         savedSettings = JSON.parse(WMEWAL.LZString.decompress(localStorage[savedSettingsKey]));
-                    } catch (e) {}
-                    if (typeof savedSettings === "undefined" || savedSettings === null)
-                    {
+                    } catch (e) { }
+                    if (typeof savedSettings === "undefined" || savedSettings === null) {
                         log("debug", "decompress failed, savedSettings unrecoverable. Using blank");
                         savedSettings = [];
                     }
@@ -1437,6 +1454,7 @@ namespace WMEWAL_Places {
                 CreatedBy: null,
                 UndefStreet: false,
                 NoExternalProviders: false,
+                DuplicateExternalProvider: false,
                 NoHours: false,
                 NoPhoneNumber: false,
                 BadPhoneNumberFormat: false,
@@ -1499,6 +1517,11 @@ namespace WMEWAL_Places {
                 upd = true;
             }
 
+            if (!settings.hasOwnProperty("DuplicateExternalProvider")) {
+                settings.DuplicateExternalProvider = false;
+                upd = true;
+            }
+
             if (!settings.hasOwnProperty("NoHours")) {
                 settings.NoHours = false;
                 upd = true;
@@ -1507,12 +1530,12 @@ namespace WMEWAL_Places {
             if (!settings.hasOwnProperty("NoPhoneNumber")) {
                 settings.NoPhoneNumber = false;
             }
-            
+
             if (!settings.hasOwnProperty("BadPhoneNumberFormat")) {
                 settings.BadPhoneNumberFormat = false;
                 upd = true;
             }
-            
+
             if (!settings.hasOwnProperty("NoWebsite")) {
                 settings.NoWebsite = false;
             }
@@ -1633,6 +1656,9 @@ namespace WMEWAL_Places {
         }
         if (issues & Issue.NoExternalProviders) {
             issuesList.push("No external provider IDs");
+        }
+        if (issues & Issue.DuplicateExternalProvider) {
+            issuesList.push("Duplicate external provider IDs");
         }
         if (issues & Issue.PendingApproval) {
             issuesList.push("Pending approval");
